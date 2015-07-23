@@ -16,6 +16,11 @@ class PagerdutyNotification < Notification
     pd.trigger("Job \"#{job.name}\" ran too early")
   end
 
+  def late_alert(job)
+    pd = Pagerduty.new(self.value)
+    pd.trigger("Job \"#{job.name}\" took too long to run")
+  end
+
   def recover(job, event_key)
     if event_key
       incident = Pagerduty.new(self.value).get_incident(event_key)

@@ -14,6 +14,10 @@ class EmailNotification < Notification
     ActionMailer::Base.mail(:from => Rails.application.config.notification_from_email, :to => self.value, :subject => "Job \"#{job.name}\" ran too early", :body => "#{job.name} -  Ran at: #{now_date_str}, Scheduled for: #{job.next_scheduled_time_str}").deliver!
   end
 
+  def late_alert(job)
+    ActionMailer::Base.mail(:from => Rails.application.config.notification_from_email, :to => self.value, :subject => "Job \"#{job.name}\" took too long to run", :body => "#{job.name} -  Ran at: #{now_date_str}, Scheduled for: #{job.next_scheduled_time_str}").deliver!
+  end
+
   def recover(job, event_key)
     if event_key
       expired_date_str = Time.at(event_key.to_i).in_time_zone(TIME_ZONE).strftime("%B %-d, %Y %l:%M:%S%P %Z")

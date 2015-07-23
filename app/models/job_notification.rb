@@ -20,6 +20,14 @@ class JobNotification < ActiveRecord::Base
     end
   end
 
+  def late_alert
+    begin
+      notification.late_alert(job)
+    rescue Exception => e
+      puts "Exception on late alert trigger for #{job.name} - #{notification.name}: #{e.inspect}"
+    end
+  end
+
   def recover!
     begin
       notification.recover(job, last_event_key)

@@ -45,12 +45,12 @@ end
 
 crontab = read_yaml(options[:name])['crontab']
 
-if !crontab.nil? then
+unless crontab.nil? then
   crontab.keys.each do |key|
     namespace = OpenStruct.new(parse_crontab_yaml(crontab[key]))
     cronLine = template.result(namespace.instance_eval { binding })
-    job = CronJob.new({:name => key, :notification_ids => ["", options[:id]], :buffer_time => "60", :cron_expression => cronLine})
-    job.save
+    job = CronJob.new({:name => key, :notification_ids => ["", options[:id]], :buffer_time => "60", :cron_expression => cronLine, :expected_run_time => crontab[key]["run_time"]})
+    job.save!
   end
 end
 

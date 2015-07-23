@@ -12,6 +12,10 @@ class Notification < ActiveRecord::Base
     raise "ERROR: early_alert must be defined"
   end
 
+  def late_alert(job)
+    raise "ERROR: late_alert must be defined"
+  end
+
   def recover(job, event_key)
     # Implementation of this is optional
   end

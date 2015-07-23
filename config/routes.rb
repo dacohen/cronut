@@ -2,7 +2,7 @@ Cronut::Application.routes.draw do
   resources :notifications
   resources :jobs
 
-  post 'ping/' => "jobs#ping"
+  post 'ping/:type' => "jobs#ping"
 
   root to: 'jobs#index'
   # The priority is based upon order of creation:

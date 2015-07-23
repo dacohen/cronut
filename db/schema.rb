@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20140707215534) do
+ActiveRecord::Schema.define(version: 20150723184441) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -62,6 +62,8 @@ ActiveRecord::Schema.define(version: 20140707215534) do
     t.datetime "created_at"
     t.datetime "updated_at"
     t.string   "status",               default: "READY", null: false
+    t.integer  "expected_run_time"
+    t.datetime "next_end_time"
   end
 
   add_index "jobs", ["next_scheduled_time"], name: "index_jobs_on_next_scheduled_time", using: :btree

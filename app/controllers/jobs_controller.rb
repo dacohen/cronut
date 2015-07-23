@@ -48,11 +48,11 @@ class JobsController < ApplicationController
     if params[:job][:type] == "CronJob"
       params[:job].delete(:type)
       params[:job].delete(:frequency)
-      @job = CronJob.new(params.require(:job).permit(:name, :notifications, :notification_ids, :buffer_time, :cron_expression))
+      @job = CronJob.new(job_params)
     elsif params[:job][:type] == "IntervalJob"
       params[:job].delete(:type)
       params[:job].delete(:cron_expression)
-      @job = IntervalJob.new(params.require(:job).permit(:name, :notifications, :notification_ids, :buffer_time, :frequency))
+      @job = IntervalJob.new(job_params)
     else
       @job = Job.new
       respond_to do |format|
@@ -117,7 +117,13 @@ class JobsController < ApplicationController
       raise ActiveRecord::RecordNotFound.new('Not Found')
     end
 
-    @job.ping!
+    if params[:type] == "start" then
+      @job.ping_start!
+    elsif params[:type] == "end" then
+      @job.ping_end!
+    else
+      raise "Invalid ping type!"
+    end
 
     render :json => { status: "OK" }
   end
@@ -132,6 +138,6 @@ class JobsController < ApplicationController
   private
 
   def job_params
-    params.require(:job).permit(:name, :notifications, :buffer_time, :notification_ids => [])
+    params.require(:job).permit(:name, :notifications, :buffer_time, :expected_run_time, :cron_expression, :frequency, :notification_ids => [])
   end
 end

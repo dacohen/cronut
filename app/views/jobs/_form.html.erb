@@ -38,6 +38,10 @@
     <%= f.text_field :buffer_time %>
   </div>
   <div class="field">
+    <%= f.label :expected_run_time %><br />
+    <%= f.text_field :expected_run_time %>
+  </div>
+  <div class="field">
     <%= f.label :notifications %><br />
     <%= collection_select :job, :notifications, Notification.all, :id, :name, { :selected => @job.notification_ids }, { :multiple => true, :name => 'job[notification_ids][]' } %>
   </div>

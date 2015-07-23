@@ -9,7 +9,7 @@ class Job < ActiveRecord::Base
   default_scope ->{ order('next_scheduled_time, name') }
 
   validates :name, :presence => true
-  validates_inclusion_of :status, :in => ["READY", "ACTIVE", "EXPIRED"]
+  validates_inclusion_of :status, :in => ["READY", "ACTIVE", "EXPIRED", "HUNG"]
 
   def create_public_id!
     public_id = SecureRandom.hex(6).upcase
@@ -23,8 +23,9 @@ class Job < ActiveRecord::Base
     self.public_id = public_id
   end
 
-  def ping!
+  def ping_start!
     self.last_successful_time = Time.now
+    set_current_end_time
     check_if_ping_is_too_early
     check_if_job_recovered
     puts "Pinging job #{self.name}"
@@ -32,13 +33,36 @@ class Job < ActiveRecord::Base
     self.save!
   end
 
+  def ping_end!
+    check_if_pinged_within_buffer_time
+    set_next_end_time
+    check_if_job_recovered
+    puts "Stopping job #{self.name}"
+    self.status = "ACTIVE"
+    self.save!
+  end
+
   def expire!
     if self.status == "ACTIVE" then
       self.status = "EXPIRED"
-      job_notifications.each { |jn|
-        jn.alert!
-      }
+        job_notifications.each { |jn|
+          jn.alert!
+        }
       self.save!
+    end
+  end
+
+  def hung!
+    if self.status == "ACTIVE" then
+      self.status = "HUNG"
+      job_notifications.each do |jn|
+        jn.late_alert
+      end
+
+      check_if_pinged_within_buffer_time
+      set_next_end_time
+      self.save!
+
     end
   end
 
@@ -66,6 +90,14 @@ class Job < ActiveRecord::Base
       puts "Job: #{job.name} expired"
       job.expire!
     }
+
+    hung_jobs = Job.where("next_end_time < ?", Time.now)
+    puts "#{hung_jobs.length} jobs hung"
+
+    hung_jobs.each do |job|
+      puts "Job: #{job.name} hung"
+      job.hung!
+    end
   end
 
   def self.time_str(seconds)
@@ -111,7 +143,7 @@ class Job < ActiveRecord::Base
   end
 
   def check_if_job_recovered
-    if self.status == "EXPIRED"
+    if self.status == "EXPIRED" or self.status == "HUNG" then
       job_notifications.each { |jn|
         jn.recover!
       }
@@ -124,6 +156,14 @@ class Job < ActiveRecord::Base
 
   def set_next_scheduled_time!
     self.next_scheduled_time = calculate_next_scheduled_time
+  end
+
+  def set_next_end_time
+    self.next_end_time = self.next_scheduled_time + self.expected_run_time
+  end
+
+  def set_current_end_time
+    self.next_end_time = self.last_successful_time + self.expected_run_time
   end
 
   def reset_status!
