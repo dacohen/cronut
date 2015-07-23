@@ -1,0 +1,6 @@
+<%= minute   ? (minute   .kind_of?(Array) ? minute   .join(',') : minute   ) : '*' %> <%     #this is all one line after ERB is done with it
+%><%= hour     ? (hour     .kind_of?(Array) ? hour     .join(',') : hour     ) : '*' %> <%         #this is all one line after ERB is done with it
+%><%= monthday ? (monthday .kind_of?(Array) ? monthday .join(',') : monthday ) : '*' %> <% #this is all one line after ERB is done with it
+%><%= month    ? (month    .kind_of?(Array) ? month    .join(',') : month    ) : '*' %> <%       #this is all one line after ERB is done with it
+%><%= weekday  ? (weekday  .kind_of?(Array) ? weekday  .join(',') : weekday  ) : '*' %> <%   #this is all one line after ERB is done with it
+%>

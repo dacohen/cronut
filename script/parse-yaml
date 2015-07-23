@@ -1,0 +1,60 @@
+#!/usr/bin/env ruby
+require 'rubygems'
+require 'optparse'
+require 'yaml'
+require 'erb'
+require 'ostruct'
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: parse-yaml -f FILE -i NOTIFICATION_ID"
+  opts.on("-f", "--file [Name of File]", "The file which has the crontab yaml") do |name|
+    options[:name] = name
+  end
+  opts.on("-i", "--id [Id of Notification]", "The notification id to use") do |id|
+    options[:id] = id
+  end
+end.parse!
+
+if options[:name].nil? or options[:id].nil?
+  raise OptionParser::MissingArgument, 'Script requires a filename and Id'
+end
+
+# Load Rails
+require './config/environment.rb'
+
+# Load template
+template = ERB.new(File.read(Rails.root.join('script', 'cron.erb')))
+
+def read_yaml(filename)
+  file = File.read(filename)
+  return YAML.load(file)
+end
+
+def parse_crontab_yaml(entry)
+  cronHash = {}
+
+  cronHash["minute"] = entry["minute"] unless entry["minute"].nil?
+  cronHash["hour"] = entry["hour"] unless entry["hour"].nil?
+  cronHash["monthday"] = entry["monthday"] unless entry["monthday"].nil?
+  cronHash["month"] = entry["month"] unless entry["month"].nil?
+  cronHash["weekday"] = entry["weekday"] unless entry["weekday"].nil?
+
+  return cronHash
+end
+
+crontab = read_yaml(options[:name])['crontab']
+
+if !crontab.nil? then
+  crontab.keys.each do |key|
+    namespace = OpenStruct.new(parse_crontab_yaml(crontab[key]))
+    cronLine = template.result(namespace.instance_eval { binding })
+    job = CronJob.new({:name => key, :notification_ids => ["", options[:id]], :buffer_time => "60", :cron_expression => cronLine})
+    job.save
+  end
+end
+
+
+
+
+

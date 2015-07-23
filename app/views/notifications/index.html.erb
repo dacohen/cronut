@@ -2,6 +2,7 @@
 
 <table>
   <tr>
+    <th>Id</th>
     <th>Name</th>
     <th>Type</th>
     <th>Value</th>
@@ -12,6 +13,7 @@
 
 <% @notifications.each do |notification| %>
   <tr>
+    <td><b><%= notification.id %></td>
     <td><%= notification.name %></td>
     <td><%= notification.type %></td>
     <td><%= notification.value %></td>

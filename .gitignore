@@ -16,3 +16,10 @@
 
 # Ignore Public Folder
 /public/assets
+
+
+# Ignore emacs temp files
+.#*
+#*
+*#
+*~
