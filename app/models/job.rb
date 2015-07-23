@@ -4,7 +4,7 @@ class Job < ActiveRecord::Base
 
   before_create :create_public_id!, :if => ->{ self.public_id.blank?}
   before_save :check_if_pinged_within_buffer_time
-  before_save :reset_status!
+  before_create :reset_status!
 
   default_scope ->{ order('next_scheduled_time, name') }
 
@@ -33,11 +33,13 @@ class Job < ActiveRecord::Base
   end
 
   def expire!
-    self.status = "EXPIRED"
-    job_notifications.each { |jn|
-      jn.alert!
-    }
-    self.save!
+    if self.status == "ACTIVE" then
+      self.status = "EXPIRED"
+      job_notifications.each { |jn|
+        jn.alert!
+      }
+      self.save!
+    end
   end
 
   def extra_time

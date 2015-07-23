@@ -5,8 +5,11 @@
 #   gem 'sqlite3'
 development:
   adapter: postgresql
+  encoding: unicode
   database: cronut
   host: localhost
+  username: cronut
+  password: cronut
 
 staging:
   adapter: postgresql

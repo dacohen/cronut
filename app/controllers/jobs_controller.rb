@@ -118,6 +118,8 @@ class JobsController < ApplicationController
     end
 
     @job.ping!
+
+    render :json => { status: "OK" }
   end
 
   def verify_api_token
@@ -130,6 +132,6 @@ class JobsController < ApplicationController
   private
 
   def job_params
-    params.require(:job).permit(:name, :notifications, :notification_ids, :buffer_time)
+    params.require(:job).permit(:name, :notifications, :buffer_time, :notification_ids => [])
   end
 end

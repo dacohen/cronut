@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Cronut</title>
+  <title>Cronut - Patientco</title>
   <%= stylesheet_link_tag    "application", :media => "all" %>
   <%= javascript_include_tag "application" %>
   <%= csrf_meta_tags %>
@@ -15,4 +15,9 @@
 </p>
 
 </body>
+
+<p>
+  Current Time: <b><%= Time.now.strftime("%H:%M:%S %Z") %></b>
+</p>
+
 </html>
