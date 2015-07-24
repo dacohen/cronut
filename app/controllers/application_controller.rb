@@ -5,7 +5,7 @@ class ApplicationController < ActionController::Base
   DEFAULT_PASSWORD = "password"
 
   before_filter :filter_for_ip_whitelist
-  before_filter :basic_auth
+  before_filter :basic_auth, :except => [:health]
 
   private
 
