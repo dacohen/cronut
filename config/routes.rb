@@ -4,6 +4,8 @@ Cronut::Application.routes.draw do
 
   post 'ping/:type' => "jobs#ping"
 
+  get '/health' => "status#health"
+
   root to: 'jobs#index'
   # The priority is based upon order of creation:
   # first created -> highest priority.
