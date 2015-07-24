@@ -9,7 +9,7 @@ gem 'rails', '4.2.2'
 
 #gem 'activerecord-postgresql-adapter'
 
-gem 'pg', '= 0.18.2'
+gem 'mysql'
 
 # Gems used only for assets and not required
 # in production environments by default.

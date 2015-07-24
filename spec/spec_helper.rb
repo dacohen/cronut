@@ -62,6 +62,9 @@ RSpec.configure do |config|
   config.mock_with :rspec do |c|
     c.syntax = [:should, :expect]
   end
+
+  config.filter_run_excluding :broken => true
+
 end
 
 def basic_auth_login

@@ -3,6 +3,7 @@ require 'test_helper'
 class JobsControllerTest < ActionController::TestCase
   setup do
     @job = jobs(:one)
+    request.env['HTTP_AUTHORIZATION'] = ActionController::HttpAuthentication::Basic.encode_credentials("admin", "password")
   end
 
   test "should get index" do
@@ -17,8 +18,8 @@ class JobsControllerTest < ActionController::TestCase
   end
 
   test "should create job" do
-    assert_difference('job.count') do
-      post :create, job: { name: @job.name, email: @job.email, type: "IntervalJob", frequency: 60}
+    assert_difference('Job.count') do
+      post :create, job: { name: @job.name, type: @job.type, frequency: @job.frequency }
     end
 
     assert_redirected_to job_path(assigns(:job))
@@ -35,12 +36,12 @@ class JobsControllerTest < ActionController::TestCase
   end
 
   test "should update job" do
-    put :update, id: @job, job: { name: @job.name, email: @job.email, type: "IntervalJob", frequency: 60}
+    put :update, id: @job, job: { name: @job.name, type: @job.type, frequency: @job.frequency }
     assert_redirected_to job_path(assigns(:job))
   end
 
   test "should destroy job" do
-    assert_difference('job.count', -1) do
+    assert_difference('Job.count', -1) do
       delete :destroy, id: @job
     end
 

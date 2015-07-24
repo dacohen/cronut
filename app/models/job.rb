@@ -3,7 +3,7 @@ class Job < ActiveRecord::Base
   has_many :notifications, -> { uniq }, :through => :job_notifications
 
   before_create :create_public_id!, :if => ->{ self.public_id.blank?}
-  before_save :check_if_pinged_within_buffer_time
+  before_create :initial_scheduled_time!, :if => ->{ self.next_scheduled_time.blank? }
   before_create :reset_status!
 
   default_scope ->{ order('next_scheduled_time, name') }
@@ -34,9 +34,9 @@ class Job < ActiveRecord::Base
   end
 
   def ping_end!
-    check_if_pinged_within_buffer_time
     set_next_end_time
     check_if_job_recovered
+    set_next_scheduled_time!
     puts "Stopping job #{self.name}"
     self.status = "ACTIVE"
     self.save!
@@ -48,6 +48,7 @@ class Job < ActiveRecord::Base
         job_notifications.each { |jn|
           jn.alert!
         }
+      set_next_scheduled_time!
       self.save!
     end
   end
@@ -59,7 +60,6 @@ class Job < ActiveRecord::Base
         jn.late_alert
       end
 
-      check_if_pinged_within_buffer_time
       set_next_end_time
       self.save!
 
@@ -125,12 +125,6 @@ class Job < ActiveRecord::Base
   end
 
   private
-  def check_if_pinged_within_buffer_time
-    if !self.last_successful_time_changed? || !buffer_time || !next_scheduled_time || self.next_scheduled_time <= Time.now || (self.last_successful_time && self.last_successful_time + (self.buffer_time * 2).seconds >= self.next_scheduled_time)
-      set_next_scheduled_time!
-    end
-  end
-
   def check_if_ping_is_too_early
     # If the job had already expired, we don't want the subsequent ping to be considered "early"
     if buffer_time && self.status != "EXPIRED"
@@ -159,14 +153,18 @@ class Job < ActiveRecord::Base
   end
 
   def set_next_end_time
-    self.next_end_time = self.next_scheduled_time + self.expected_run_time
+    self.next_end_time = self.next_scheduled_time + self.expected_run_time.seconds
   end
 
   def set_current_end_time
-    self.next_end_time = self.last_successful_time + self.expected_run_time
+    self.next_end_time = self.last_successful_time + self.expected_run_time.seconds
   end
 
   def reset_status!
     self.status = "READY" if !self.status_changed? && !self.last_successful_time_changed?
+  end
+
+  def initial_scheduled_time!
+    self.next_scheduled_time = calculate_next_scheduled_time
   end
 end
