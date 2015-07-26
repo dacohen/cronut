@@ -23,7 +23,7 @@ describe JobsController do
   # This should return the minimal set of attributes required to create a valid
   # Job. As you add validations to Job, be sure to
   # adjust the attributes here as well.
-  let(:valid_attributes) { {:name => "Test job", :frequency => 3600} }
+  let(:valid_attributes) { {:name => "Test job", :frequency => 3600, :expected_run_time => 3600} }
 
   # This should return the minimal set of values that should be in the session
   # in order to pass any filters (e.g. authentication) defined in
@@ -174,9 +174,9 @@ describe JobsController do
     end
   end
 
-  describe "GET ping" do
+  describe "GET ping_start" do
     before(:each) do
-      @job = IntervalJob.create!({:name => "Test IntervalJob", :frequency => 600})
+      @job = IntervalJob.create!({:name => "Test IntervalJob", :frequency => 600, :expected_run_time => 300})
       token_value = SecureRandom.hex
       @token = ApiToken.create!({
         :name => "Test token",
@@ -246,5 +246,80 @@ describe JobsController do
       @job.next_end_time.should eq (@job.next_scheduled_time + @job.expected_run_time)
     end
   end
+
+  describe "GET ping_end" do
+    before(:each) do
+      @job = IntervalJob.create!({:name => "Test IntervalJob", :frequency => 600, :expected_run_time => 300})
+      token_value = SecureRandom.hex
+      @token = ApiToken.create!({
+        :name => "Test token",
+        :token => token_value
+      })
+      @str = "#{(Time.now - 5.seconds).to_i.to_s}-#{@job.public_id}"
+    end
+
+    after(:each) do
+      @job.destroy
+      @token.destroy
+    end
+
+    it "ignores request without token" do
+      get :ping, {:type => "end", :public_id => @str}, valid_session
+      response.body.should eql "Empty token given."
+    end
+
+    it "ignores request with invalid token" do
+      request.headers[JobsController::API_TOKEN_HEADER] = "x"
+      get :ping, {:type => "end", :public_id => @str}, valid_session
+      response.body.should eq "Invalid token."
+    end
+
+    it "ignores pings with unencrypted public id" do
+      request.headers[JobsController::API_TOKEN_HEADER] = @token.token
+      expect {
+        post :ping, {:type => "end", :public_id => @str}, valid_session
+      }.to raise_error(ActiveRecord::RecordNotFound)
+      @job.reload
+      @job.last_successful_time.should be_nil
+    end
+
+    it "ignores pings with encrypted wrong id" do
+      wrong_str = "#{Time.now.to_i.to_s}-abc"
+      request.headers[JobsController::API_TOKEN_HEADER] = @token.token
+      expect {
+        post :ping, {:type => "end", :public_id => Encryptor.encrypt(wrong_str)}, valid_session
+      }.to raise_error(ActiveRecord::RecordNotFound)
+      @job.reload
+      @job.last_successful_time.should be_nil
+    end
+
+    it "ignores pings with encrypted wrong date" do
+      wrong_str = "#{(Time.now - 31.seconds).to_i.to_s}-#{@job.public_id}"
+      request.headers[JobsController::API_TOKEN_HEADER] = @token.token
+      expect {
+        post :ping, {:type => "end", :public_id => Encryptor.encrypt(wrong_str)}, valid_session
+      }.to raise_error(ActiveRecord::RecordNotFound)
+      @job.reload
+      @job.last_successful_time.should be_nil
+    end
+
+    it "pings end with valid token" do
+      job_initial_time = @job.last_successful_time
+      request.headers[JobsController::API_TOKEN_HEADER] = @token.token
+      post :ping, {:type => "end", :public_id => Encryptor.encrypt(@str)}, valid_session
+      @job.reload
+      response.status.should eq 200
+      @job.last_successful_time.should eq job_initial_time
+    end
+
+    it "pings end with valid token" do
+      request.headers[JobsController::API_TOKEN_HEADER] = @token.token
+      post :ping, {:type => "end", :public_id => Encryptor.encrypt(@str)}, valid_session
+      @job.reload
+      response.status.should eq 200
+      @job.next_end_time.should eq (@job.next_scheduled_time + @job.expected_run_time)
+    end
+  end
+
 
 end

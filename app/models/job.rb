@@ -5,10 +5,12 @@ class Job < ActiveRecord::Base
   before_create :create_public_id!, :if => ->{ self.public_id.blank?}
   before_create :initial_scheduled_time!, :if => ->{ self.next_scheduled_time.blank? }
   before_create :reset_status!
+  before_save :reset_status!, :set_next_scheduled_time!, :if => :timing_changed
 
   default_scope ->{ order('next_scheduled_time, name') }
 
   validates :name, :presence => true
+  validates :expected_run_time, :presence => true
   validates_inclusion_of :status, :in => ["READY", "ACTIVE", "EXPIRED", "HUNG"]
 
   def create_public_id!
@@ -167,4 +169,9 @@ class Job < ActiveRecord::Base
   def initial_scheduled_time!
     self.next_scheduled_time = calculate_next_scheduled_time
   end
+
+  def timing_changed
+    self.frequency_changed? or self.cron_expression_changed? or self.expected_run_time_changed?
+  end
+
 end
