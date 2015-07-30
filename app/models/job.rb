@@ -5,7 +5,7 @@ class Job < ActiveRecord::Base
   before_create :create_public_id!, :if => ->{ self.public_id.blank?}
   before_create :initial_scheduled_time!, :if => ->{ self.next_scheduled_time.blank? }
   before_create :reset_status!
-  before_save :reset_status!, :set_next_scheduled_time!, :if => :timing_changed
+ # before_save :reset_status!, :set_next_scheduled_time!, :if => :timing_changed
 
   default_scope ->{ order('next_scheduled_time, name') }
 
@@ -36,7 +36,7 @@ class Job < ActiveRecord::Base
   end
 
   def ping_end!
-    next_scheduled_time!
+    set_next_scheduled_time!
     set_next_end_time
     check_if_job_recovered
     puts "Stopping job #{self.name}"
