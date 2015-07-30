@@ -36,9 +36,9 @@ class Job < ActiveRecord::Base
   end
 
   def ping_end!
+    next_scheduled_time!
     set_next_end_time
     check_if_job_recovered
-    set_next_scheduled_time!
     puts "Stopping job #{self.name}"
     self.status = "ACTIVE"
     self.save!
