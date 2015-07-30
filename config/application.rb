@@ -54,7 +54,5 @@ module Cronut
     config.assets.version = '1.0'
 
     config.autoload_paths += %W(#{config.root}/lib)
-    
-    config.force_ssl = true
   end
 end
