@@ -11,7 +11,7 @@ class Job < ActiveRecord::Base
 
   validates :name, :presence => true
   validates :expected_run_time, :presence => true
-  validates_inclusion_of :status, :in => ["READY", "ACTIVE", "EXPIRED", "HUNG"]
+  validates_inclusion_of :status, :in => ["READY", "ACTIVE", "EXPIRED", "HUNG", "RUNNING"]
 
   def create_public_id!
     public_id = SecureRandom.hex(6).upcase
@@ -31,7 +31,7 @@ class Job < ActiveRecord::Base
     check_if_ping_is_too_early
     check_if_job_recovered
     puts "Pinging job #{self.name}"
-    self.status = "ACTIVE"
+    self.status = "RUNNING"
     self.save!
   end
 
@@ -56,7 +56,7 @@ class Job < ActiveRecord::Base
   end
 
   def hung!
-    if self.status == "ACTIVE" then
+    if self.status == "RUNNING" then
       self.status = "HUNG"
       job_notifications.each do |jn|
         jn.late_alert
