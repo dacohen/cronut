@@ -5,6 +5,7 @@
     <th>Name</th>
     <th>Type</th>
     <th>Frequency</th>
+    <th>Run Time</th>
     <th>Buffer Time</th>
     <th>Last successful time</th>
     <th>Next scheduled time</th>
@@ -21,6 +22,7 @@
     <td><%= job.name %></td>
     <td><%= job.type %></td>
     <td><%= job.is_a?(CronJob) ? job.cron_expression : job.frequency_str %></td>
+    <td><%= job.expected_run_time %></td>
     <td><%= job.buffer_time_str %></td>
     <td><%= job.last_successful_time_str %></td>
     <td><%= job.next_scheduled_time_str %></td>
