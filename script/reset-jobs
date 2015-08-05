@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+require './config/environment.rb'
+
+Job.all.each do |job|
+  if job.status == "EXPIRED" or job.status == "HUNG" then
+    job.status = "ACTIVE"
+    job.send(:set_next_scheduled_time!)
+    job.send(:set_next_end_time)
+    job.save!
+  end
+end
+
