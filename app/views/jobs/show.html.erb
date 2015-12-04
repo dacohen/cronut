@@ -22,7 +22,7 @@
 
 <p>
   <b>Expected Run time:</b>
-  <%= @job.expected_run_time %> seconds
+  <%= @job.expected_run_time_str %> seconds
 </p>
 
 <p>
@@ -37,8 +37,8 @@
 
 <p>
   <b>Status:</b>
-  <span class="<%= @job.status.downcase %>">
-    <%= @job.status.capitalize %>
+  <span class="<%= @job.state.to_s.downcase %>">
+    <%= @job.state.to_s.capitalize %>
   </span>
 </p>
 

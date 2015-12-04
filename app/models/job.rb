@@ -1,17 +1,15 @@
 class Job < ActiveRecord::Base
+  as_enum :state, %i{ready active running expired hung}
+
   has_many :job_notifications, :dependent => :destroy
   has_many :notifications, -> { uniq }, :through => :job_notifications
 
   before_create :create_public_id!, :if => ->{ self.public_id.blank?}
-  before_create :initial_scheduled_time!, :if => ->{ self.next_scheduled_time.blank? }
-  before_create :reset_status!
- # before_save :reset_status!, :set_next_scheduled_time!, :if => :timing_changed
 
-  default_scope ->{ order('next_scheduled_time, name') }
+  default_scope ->{ order('state_cd DESC, name') }
 
   validates :name, :presence => true
   validates :expected_run_time, :presence => true
-  validates_inclusion_of :status, :in => ["READY", "ACTIVE", "EXPIRED", "HUNG", "RUNNING"]
 
   def create_public_id!
     public_id = SecureRandom.hex(6).upcase
@@ -23,82 +21,97 @@ class Job < ActiveRecord::Base
     end
 
     self.public_id = public_id
+    self.ready!
   end
 
   def ping_start!
-    self.last_successful_time = Time.now
-    set_current_end_time
-    check_if_ping_is_too_early
-    check_if_job_recovered
-    puts "Pinging job #{self.name}"
-    self.status = "RUNNING"
+    if self.ready? or self.active? then
+      # If we just created the job, we might have just missed the previous scheduled time
+      if between(Time.now(), self.next_scheduled_time).floor <= get_buffer_time or between(Time.now(), self.previous_scheduled_time).floor <= get_buffer_time then
+        self.go_run!
+      else
+        job_notifications.each { |jn| jn.early_alert }
+      end
+    elsif self.expired? then
+      self.go_run!
+      job_notifications.each { |jn| jn.recover! }
+    end
     self.save!
   end
 
   def ping_end!
-    set_next_scheduled_time!
-    set_next_end_time
-    check_if_job_recovered
-    puts "Stopping job #{self.name}"
-    self.status = "ACTIVE"
+    if self.running? then
+      self.active!
+    elsif self.hung? then
+      self.active!
+      job_notifications.each { |jn| jn.recover! }
+    end
     self.save!
   end
 
-  def expire!
-    if self.status == "ACTIVE" then
-      self.status = "EXPIRED"
-        job_notifications.each { |jn|
-          jn.alert!
-        }
-      set_next_scheduled_time!
-      self.save!
+  def runtime_exceeded!
+    if self.running? then
+      puts "#{self.name} expired"
+      self.hung!
+      job_notifications.each { |jn| jn.late_alert }
     end
+    self.save!
   end
 
-  def hung!
-    if self.status == "RUNNING" then
-      self.status = "HUNG"
-      job_notifications.each do |jn|
-        jn.late_alert
-      end
-
-      set_next_end_time
-      self.save!
-
+  def time_passed!
+    if self.active? then
+      puts "#{self.name} never ran"
+      self.expired!
+      job_notifications.each { |jn| jn.alert! }
     end
+    self.save!
   end
 
-  def extra_time
-    return (buffer_time ? buffer_time : 0).seconds
+  # Only for testing
+  def force_run!
+    self.go_run!
+    self.save!
+  end
+
+  # Only for testing
+  def force_active!
+    self.active!
+    # So next scheduled time is NOW, if possible
+    self.last_successful_time = Time.now - 5.seconds
+    self.save!
+  end
+
+  def go_run!
+    self.running!
+    self.last_successful_time = Time.now()
   end
 
   def buffer_time_str
-    return buffer_time ? Job.time_str(buffer_time) : "none"
+    buffer_time ? Job.time_str(buffer_time) : "none"
+  end
+
+  def expected_run_time_str
+    Job.time_str(expected_run_time)
   end
 
   def last_successful_time_str
-    return last_successful_time ? last_successful_time.in_time_zone(TIME_ZONE).strftime("%B %-d, %Y %l:%M:%S%P %Z") : "never"
+    last_successful_time ? last_successful_time.in_time_zone(TIME_ZONE).strftime("%B %-d, %Y %l:%M:%S%P %Z") : "never"
   end
 
   def next_scheduled_time_str
-    return next_scheduled_time.in_time_zone(TIME_ZONE).strftime("%B %-d, %Y %l:%M:%S%P %Z")
+    #now = self.last_successful_time ? self.last_successful_time : Time.now
+    self.next_scheduled_time.in_time_zone(TIME_ZONE).strftime("%B %-d, %Y %l:%M:%S%P %Z")
   end
 
   def self.check_expired_jobs
-    expired_jobs = Job.where("next_scheduled_time < ?", Time.now)
-    puts "#{expired_jobs.length} jobs expired"
+    Job.all.each do |job|
+      if job.last_successful_time and between(Time.now(), job.last_successful_time) >= job.expected_run_time + job.get_buffer_time then
+        job.runtime_exceeded!
+      end
 
-    expired_jobs.each { |job|
-      puts "Job: #{job.name} expired"
-      job.expire!
-    }
-
-    hung_jobs = Job.where("next_end_time < ?", Time.now)
-    puts "#{hung_jobs.length} jobs hung"
-
-    hung_jobs.each do |job|
-      puts "Job: #{job.name} hung"
-      job.hung!
+      if (Time.now() > job.next_scheduled_time(job.last_successful_time)) and between(Time.now(), job.next_scheduled_time(job.last_successful_time)) >= job.get_buffer_time then
+        job.time_passed!
+      end
     end
   end
 
@@ -126,52 +139,16 @@ class Job < ActiveRecord::Base
     return "#{num} #{unit.pluralize(num)}"
   end
 
-  private
-  def check_if_ping_is_too_early
-    # If the job had already expired, we don't want the subsequent ping to be considered "early"
-    if buffer_time && self.status != "EXPIRED"
-      if last_successful_time < next_scheduled_time - (buffer_time * 2).seconds
-        job_notifications.each { |jn|
-          jn.early_alert
-        }
-      end
-    end
+  def get_buffer_time
+    (buffer_time ? buffer_time : 1).to_i
   end
 
-  def check_if_job_recovered
-    if self.status == "EXPIRED" or self.status == "HUNG" then
-      job_notifications.each { |jn|
-        jn.recover!
-      }
-    end
+  def between(start_time, end_time)
+    TimeDifference.between(start_time, end_time).in_seconds
   end
 
-  def calculate_next_scheduled_time(now = Time.now)
-    raise "ERROR: calculate_next_scheduled_time must be defined"
-  end
-
-  def set_next_scheduled_time!
-    self.next_scheduled_time = calculate_next_scheduled_time
-  end
-
-  def set_next_end_time
-    self.next_end_time = self.next_scheduled_time + self.expected_run_time.seconds
-  end
-
-  def set_current_end_time
-    self.next_end_time = self.last_successful_time + self.expected_run_time.seconds
-  end
-
-  def reset_status!
-    self.status = "READY" if !self.status_changed? && !self.last_successful_time_changed?
-  end
-
-  def initial_scheduled_time!
-    self.next_scheduled_time = calculate_next_scheduled_time
-  end
-
-  def timing_changed
-    self.frequency_changed? or self.cron_expression_changed? or self.expected_run_time_changed?
+  def self.between(start_time, end_time)
+    TimeDifference.between(start_time, end_time).in_seconds
   end
 
 end

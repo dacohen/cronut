@@ -125,7 +125,7 @@ class JobsController < ApplicationController
       raise "Invalid ping type!"
     end
 
-    render :json => { status: "OK" }
+    render :json => { action: params[:type], state: @job.state.to_s }
   end
 
   def verify_api_token
