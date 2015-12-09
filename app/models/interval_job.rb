@@ -9,8 +9,12 @@ class IntervalJob < Job
     return Job.time_str(frequency)
   end
 
-  private
-  def calculate_next_scheduled_time(now = Time.now)
-    return now + frequency.seconds + extra_time
+  def next_scheduled_time(now = Time.now)
+    now + frequency.seconds
   end
+
+  def previous_scheduled_time(now = Time.now)
+    now - frequency.seconds
+  end
+
 end

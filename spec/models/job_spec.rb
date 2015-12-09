@@ -27,22 +27,11 @@ describe Job do
     end
   end
 
-  describe "#next_scheduled_time_str" do
-    it "returns the next scheduled time in the preferred time zone" do
-      stub_const("TIME_ZONE", "America/Los_Angeles")
-
-      job = IntervalJob.new
-      job.next_scheduled_time = Time.utc(2014, 8, 7, 12)
-
-      job.next_scheduled_time_str.should eq("August 7, 2014  5:00:00am PDT")
-    end
-  end
-
   describe "IntervalJobs" do
     describe "without buffer" do
       before(:each) do
         @start_time = Time.now
-        @job = IntervalJob.create!({:name => "Test IntervalJob", :frequency => 600, :expected_run_time => 3600, :status => "ACTIVE"})
+        @job = IntervalJob.create!({:name => "Test IntervalJob", :frequency => 600, :expected_run_time => 3600})
       end
 
       after(:each) do
@@ -53,7 +42,7 @@ describe Job do
         @job.next_scheduled_time.to_i.should eq (@start_time + 600.seconds).to_i
         @job.last_successful_time.should be_nil
         @job.public_id.should_not be_nil
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :active
       end
 
       it "pinging does not update next scheduled time" do
@@ -61,7 +50,7 @@ describe Job do
         @job.ping_start!
         @job.next_scheduled_time.to_i.should eq (ping_time + 600.seconds).to_i
         @job.last_successful_time.to_i.should eq ping_time.to_i
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :active
 
         @job.ping_end!
         @job.next_scheduled_time.to_i.should eq (ping_time + 600.seconds).to_i
@@ -74,7 +63,7 @@ describe Job do
         @job.expire!
         @job.next_scheduled_time.to_i.should eq (expire_time + 600.seconds).to_i
         @job.last_successful_time.should be_nil
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :expired
       end
 
       it "expires" do
@@ -84,7 +73,7 @@ describe Job do
         Job.check_expired_jobs
         @job.reload
         @job.next_scheduled_time.to_i.should >= (expire_time + 600.seconds).to_i
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :expired
       end
 
       it "expires and alerts notifications" do
@@ -97,7 +86,7 @@ describe Job do
         notification.should_receive(:alert)
         notification.should_not_receive(:recover)
         @job.expire!
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :expired
       end
 
       it "expires and recovers" do
@@ -114,26 +103,26 @@ describe Job do
         @job.ping_start!
       end
 
-      it "change settings resets status and next scheduled time" do
+      it "change settings resets state and next scheduled time" do
         Timecop.travel(11.minutes)
         expire_time = Time.now
         @job.expire!
         @job.next_scheduled_time.to_i.should eq (expire_time + 600.seconds).to_i
         @job.last_successful_time.should be_nil
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :expired
         @job.frequency = 500
         change_time = Time.now
         @job.save!
         @job.reload
         @job.next_scheduled_time.to_i.should eq (change_time + 500.seconds).to_i
-        @job.status.should eq "READY"
+        @job.state.should eq :ready
       end
     end
 
     describe "with buffer" do
       before(:each) do
         @start_time = Time.now
-        @job = IntervalJob.create!({:name => "Test IntervalJob", :frequency => 600, :buffer_time => 60, :expected_run_time => 3600, :status => "ACTIVE"})
+        @job = IntervalJob.create!({:name => "Test IntervalJob", :frequency => 600, :buffer_time => 60, :expected_run_time => 3600, :state => :active})
       end
 
       after(:each) do
@@ -144,7 +133,7 @@ describe Job do
         @job.next_scheduled_time.to_i.should eq (@start_time + 660.seconds).to_i
         @job.last_successful_time.should be_nil
         @job.public_id.should_not be_nil
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :active
       end
 
       it "pinging outside of buffer does not postpones next scheduled time" do
@@ -153,7 +142,7 @@ describe Job do
         @job.ping_start!
         @job.next_scheduled_time.to_i.should eq (@start_time + 660.seconds).to_i
         @job.last_successful_time.to_i.should eq ping_time.to_i
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :active
       end
 
       it "pinging within buffer postpones next scheduled time" do
@@ -162,7 +151,7 @@ describe Job do
         Timecop.travel(9.minutes)
         @job.next_scheduled_time.to_i.should eq (ping_time + 660.seconds).to_i
         @job.last_successful_time.to_i.should eq ping_time.to_i
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :active
       end
 
       it "expiring postpones next scheduled time" do
@@ -171,7 +160,7 @@ describe Job do
         @job.expire!
         @job.next_scheduled_time.to_i.should eq (expire_time + 660.seconds).to_i
         @job.last_successful_time.should be_nil
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :expired
       end
 
       it "expires" do
@@ -181,7 +170,7 @@ describe Job do
         Job.check_expired_jobs
         @job.reload
         @job.next_scheduled_time.to_i.should >= (expire_time + 660.seconds).to_i
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :expired
       end
 
       it "expires and alerts notifications" do
@@ -207,7 +196,7 @@ describe Job do
         notification.should_receive(:early_alert)
         notification.should_not_receive(:recover)
         @job.ping_start!
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :active
       end
 
       it "does not send early alert if job is already late" do
@@ -253,13 +242,13 @@ describe Job do
         @job.expire!
         @job.next_scheduled_time.to_i.should eq (expire_time + 660.seconds).to_i
         @job.last_successful_time.should be_nil
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :expired
         @job.frequency = 500
         change_time = Time.now
         @job.save!
         @job.reload
         @job.next_scheduled_time.to_i.should eq (change_time + 560.seconds).to_i
-        @job.status.should eq "READY"
+        @job.state.should eq :ready
       end
     end
   end
@@ -270,7 +259,7 @@ describe Job do
         Timecop.travel(Time.at((Time.now.to_f / 600).floor * 600 + 1)) # round to nearest 10 mins
         @start_time = Time.now
         @next_time = Time.at((Time.now.to_f / 600).ceil * 600)
-        @job = CronJob.create!({:name => "Test CronJob", :cron_expression => "*/10 * * * *", :expected_run_time => 3600}) # every 10 mins , 1 minute run time
+        @job = CronJob.create!({:name => "Test CronJob", :cron_expression => "*/10 * * * *", :expected_run_time => 60}) # every 10 mins , 1 minute run time
       end
 
       after(:each) do
@@ -281,117 +270,77 @@ describe Job do
         @job.next_scheduled_time.to_i.should eq @next_time.to_i
         @job.last_successful_time.should be_nil
         @job.public_id.should_not be_nil
-        @job.status.should eq "READY"
+        @job.state.should eq :ready
       end
 
-      it "pinging does not update next scheduled time" do
-        ping_time = Time.now
+      it "ready ping_start on time" do
+        @job.state.should eq :ready
         @job.ping_start!
-        @job.next_scheduled_time.to_i.should eq @next_time.to_i
-        @job.last_successful_time.to_i.should eq ping_time.to_i
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :running
+      end
 
+      it "ready ping_start early" do
+        Timecop.travel(-5.minutes)
+        @job.state.should eq :ready
+        @job.ping_start!
+        @job.state.should eq :ready
+      end
+
+      it "active ping_start early" do
+        @job.force_active!
+        Timecop.travel(-5.minutes)
+        @job.state.should eq :active
+        @job.ping_start!
+        @job.state.should eq :active
+      end
+
+      it "active time_passed" do
+        @job.force_active!
+        @job.state.should eq :active
+        Timecop.travel(10.seconds)
+        Job.check_expired_jobs
+        @job.reload
+        @job.state.should eq :expired
+      end
+
+      it "running ping_end" do
+        @job.force_run!
+        @job.state.should eq :running
         @job.ping_end!
-        @job.next_scheduled_time.to_i.should eq @next_time.to_i
-        @job.last_successful_time.to_i.should eq ping_time.to_i
+        @job.state.should eq :active
       end
 
-      it "pinging updates the next scheduled time correctly" do
-        ping_time = Time.now
-        @job.ping_start!
-
-        Timecop.travel(11.minutes)
-        @job.ping_end!
-        @job.next_scheduled_time.to_i.should eq (@next_time + 600.seconds).to_i
-      end
-
-      it "rolls over next scheduled time correctly" do
-        @job.ping_start!
-        Timecop.travel(9.minutes)
-        @job.ping_end!
-        @job.next_scheduled_time.to_i.should eq @next_time.to_i
-
-        Timecop.travel(1.minutes)
-        @job.ping_start!
-        Timecop.travel(1.minutes)
-        @job.ping_end!
-        @job.next_scheduled_time.to_i.should eq (@next_time + 10.minutes).to_i
-      end
-
-      it "expiring postpones next scheduled time" do
-        @job.status = "ACTIVE"
-        Timecop.travel(10.minutes)
-        @job.expire!
-        @job.next_scheduled_time.to_i.should eq (@next_time + 600.seconds).to_i
-        @job.last_successful_time.should be_nil
-        @job.status.should eq "EXPIRED"
-      end
-
-      it "expires" do
-        @job.ping_start!
+      it "running runtime_exceeded" do
+        @job.force_run!
+        @job.state.should eq :running
         Timecop.travel(11.minutes)
         Job.check_expired_jobs
         @job.reload
-        @job.next_scheduled_time.to_i.should eq (@next_time + 600.seconds).to_i
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :hung
       end
 
-      it "hangs if job doesn't finish" do
-        @job.expected_run_time = 30
-        @job.save!
-
-        @job.ping_start!
-        Timecop.travel(40.seconds)
-        Job.check_expired_jobs
-        @job.reload
-        @job.next_scheduled_time.to_i.should eq @next_time.to_i
-        @job.status.should eq "HUNG"
-      end
-
-      it "doesn't hang if job finishes on time" do
-        @job.expected_run_time = 30
-        @job.save!
-
-        @job.ping_start!
-        Timecop.travel(30.seconds)
-        Job.check_expired_jobs
-        @job.reload
-        @job.next_scheduled_time.to_i.should eq @next_time.to_i
-        @job.status.should eq "ACTIVE"
-      end
-
-      # it "expires and alerts notifications" do
-      #   notification = PagerdutyNotification.create!({:name => "Test notification", :value => "dummy value"})
-      #   notification.stub(:alert)
-      #   notification.stub(:recover)
-      #   @job.notifications << notification
-      #   @job.save!
-      #   Timecop.travel(10.minutes)
-      #   notification.should_receive(:alert)
-      #   notification.should_not_receive(:recover)
-      #   @job.expire!
-      # end
-
-      it "expires and recovers" do
-        @job.ping_start!
-        Timecop.travel(11.minutes)
-        Job.check_expired_jobs
-        @job.reload
-        @job.status.should eq "EXPIRED"
-
+      it "hung ping_end" do
+        @job.hung!
+        @job.state.should eq :hung
         @job.ping_end!
-        @job.reload
-        @job.next_scheduled_time.to_i.should eq (@next_time + 600.seconds).to_i
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :active
+      end
+
+      it "expired ping_start" do
+        @job.expired!
+        @job.state.should eq :expired
+        @job.ping_start!
+        @job.state.should eq :running
       end
     end
 
     describe "with buffer" do
       before(:each) do
         Timecop.travel(Time.at((Time.now.to_f / 600).floor * 600 + 1)) # round to nearest 10 mins
+        @reference_time = Time.now - 1.seconds
         @start_time = Time.now
-        @next_time = Time.at((Time.now.to_f / 600).ceil * 600) + 60.seconds
-        @job = CronJob.create!({:name => "Test CronJob", :cron_expression => "*/10 * * * *", :buffer_time => 60, :expected_run_time => 3600, :status => "ACTIVE"}) # every 10 mins
+        @next_time = Time.at((Time.now.to_f / 600).ceil * 600)
+        @job = CronJob.create!({:name => "Test CronJob", :cron_expression => "*/10 * * * *", :buffer_time => 60, :expected_run_time => 600}) # every 10 mins
       end
 
       after(:each) do
@@ -402,124 +351,77 @@ describe Job do
         @job.next_scheduled_time.to_i.should eq @next_time.to_i
         @job.last_successful_time.should be_nil
         @job.public_id.should_not be_nil
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :ready
       end
-
-      it "pinging outside of buffer does not postpones next scheduled time" do
-        Timecop.travel(1.minute)
-        ping_time = Time.now
+      it "ready ping_start on time" do
+        @job.state.should eq :ready
         @job.ping_start!
-        @job.next_scheduled_time.to_i.should eq @next_time.to_i
-        @job.last_successful_time.to_i.should eq ping_time.to_i
-        @job.status.should eq "ACTIVE"
+        @job.state.should eq :running
       end
 
-      it "pinging within buffer doesn't postpone next scheduled time" do
+      it "ready ping_start early" do
+        Timecop.travel(-5.minutes)
+        @job.state.should eq :ready
         @job.ping_start!
-        ping_time = Time.now
-        Timecop.travel(9.minutes)
-        @job.next_scheduled_time.to_i.should eq @next_time.to_i
-        @job.last_successful_time.to_i.should eq ping_time.to_i
-        @job.status.should eq "ACTIVE"
-      end      
-
-      it "expiring postpones next scheduled time" do
-        Timecop.travel(11.minutes)
-        expire_time = Time.now
-        @job.expire!
-        @job.next_scheduled_time.to_i.should eq (@next_time + 600.seconds).to_i
-        @job.last_successful_time.should be_nil
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :ready
       end
 
-      it "expires" do
-        Timecop.travel(11.minutes)
-        expire_time = Time.now
+      it "active ping_start early" do
+        @job.force_active!
+        Timecop.travel(-5.minutes)
+        @job.state.should eq :active
+        @job.ping_start!
+        @job.state.should eq :active
+      end
+
+      it "active time_passed" do
+        @job.force_active!
+        @job.state.should eq :active
+        Timecop.travel(2.minutes)
         Job.check_expired_jobs
         @job.reload
-        @job.next_scheduled_time.to_i.should eq (@next_time + 600.seconds).to_i
-        @job.last_successful_time.should be_nil
-        @job.status.should eq "EXPIRED"
+        @job.state.should eq :expired
       end
 
-      it "expires and alerts notifications" do
-        notification = PagerdutyNotification.create!({:name => "Test notification", :value => "dummy value"})
-        notification.stub(:alert)
-        notification.stub(:recover)
-        @job.notifications << notification
-        @job.save!
-        Timecop.travel(11.minutes)
-        notification.should_receive(:alert)
-        notification.should_not_receive(:recover)
-        @job.expire!
-      end
-
-      it "sends early alert if pinged too early" do
-        notification = PagerdutyNotification.create!({:name => "Test notification", :value => "dummy value"})
-        notification.stub(:alert)
-        notification.stub(:early_alert)
-        notification.stub(:recover)
-        @job.notifications << notification
-        @job.save!
-        Timecop.travel(1.minute)
-        notification.should_receive(:early_alert)
-        notification.should_not_receive(:recover)
-        @job.ping_start!
-        @job.status.should eq "ACTIVE"
-      end
-
-      it "does not send early alert if job is already late" do
-        notification = PagerdutyNotification.create!({:name => "Test notification", :value => "dummy value"})
-        notification.stub(:alert)
-        notification.stub(:early_alert)
-        notification.stub(:recover)
-        @job.notifications << notification
-        @job.save!
-        Timecop.travel(1.minute)
-        @job.ping_start!
-        Timecop.travel(10.minutes)
-        notification.should_receive(:alert)
-        @job.expire!
-        Timecop.travel(2.minutes)
-        # Job already expired, we shouldn't get another notification that this late ping is early
-        notification.should_not_receive(:early_alert)
-        notification.should_receive(:recover)
+      it "running ping_end" do
+        @job.force_run!
+        @job.state.should eq :running
         @job.ping_end!
+        @job.state.should eq :active
       end
 
-      it "sends early alert if job is expired, late ping happened and the next ping was early" do
-        notification = PagerdutyNotification.create!({:name => "Test notification", :value => "dummy value"})
-        notification.stub(:alert)
-        notification.stub(:early_alert)
-        notification.stub(:recover)
-        @job.notifications << notification
-        @job.save!
-        Timecop.travel(1.minute)
-        @job.ping_start!
-        Timecop.travel(10.minutes)
-        @job.expire!
-        Timecop.travel(2.minutes)
-        @job.ping_end!
-        Timecop.travel(1.minute)
-        # We should get an early alert now, though
-        notification.should_receive(:early_alert)
-        notification.should_not_receive(:recover)
-        @job.ping_start!
-      end
-
-      it "change settings resets status and next scheduled time" do
+      it "running runtime_exceeded" do
+        @job.force_run!
+        @job.state.should eq :running
         Timecop.travel(11.minutes)
-        expire_time = Time.now
-        @job.expire!
-        @job.next_scheduled_time.to_i.should eq (@next_time + 600.seconds).to_i
+        Job.check_expired_jobs
+        @job.reload
+        @job.state.should eq :hung
+      end
+
+      it "hung ping_end" do
+        @job.hung!
+        @job.state.should eq :hung
+        @job.ping_end!
+        @job.state.should eq :active
+      end
+
+      it "expired ping_start" do
+        @job.expired!
+        @job.state.should eq :expired
+        @job.ping_start!
+        @job.state.should eq :running
+      end
+
+      it "change settings resets state and next scheduled time" do
+        @job.state.should eq :ready
+        @job.next_scheduled_time.to_i.should eq @next_time.to_i
         @job.last_successful_time.should be_nil
-        @job.status.should eq "EXPIRED"
         @job.cron_expression = "*/5 * * * *"
         @job.save!
-        @job.ping_end!
         @job.reload
-        @job.next_scheduled_time.to_i.should eq (@next_time + 300.seconds).to_i
-        @job.status.should eq "ACTIVE"
+        @job.next_scheduled_time.to_i.should eq (@reference_time + 300.seconds).to_i
+        @job.state.should eq :ready
       end
     end
   end

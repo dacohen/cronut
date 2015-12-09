@@ -28,6 +28,8 @@ gem 'jquery-rails'
 gem 'rufus-scheduler'
 gem 'clockwork'
 gem 'pagerduty'
+gem 'simple_enum'
+gem 'time_difference'
 
 group :development, :test do
   gem 'rspec-rails'

@@ -8,7 +8,7 @@ class PagerdutyNotification < Notification
 
   def alert(job)
     pd = Pagerduty.new(self.value)
-    return pd.trigger("Job \"#{job.name}\" didn't run").incident_key
+    pd.trigger("Job \"#{job.name}\" didn't run").incident_key
   end
 
   def early_alert(job)

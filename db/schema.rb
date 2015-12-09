@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20150723184441) do
+ActiveRecord::Schema.define(version: 20151203194302) do
 
   create_table "api_tokens", force: :cascade do |t|
     t.string   "name",       limit: 255
@@ -48,22 +48,20 @@ ActiveRecord::Schema.define(version: 20150723184441) do
   add_index "job_notifications", ["job_id", "notification_id"], name: "index_job_notifications_on_job_id_and_notification_id", unique: true, using: :btree
 
   create_table "jobs", force: :cascade do |t|
-    t.string   "name",                 limit: 255,                   null: false
+    t.string   "name",                 limit: 255, null: false
     t.datetime "last_successful_time"
-    t.datetime "next_scheduled_time",                                null: false
-    t.string   "public_id",            limit: 255,                   null: false
-    t.string   "type",                 limit: 255,                   null: false
+    t.string   "public_id",            limit: 255, null: false
+    t.string   "type",                 limit: 255, null: false
     t.integer  "frequency",            limit: 4
     t.string   "cron_expression",      limit: 255
     t.integer  "buffer_time",          limit: 4
     t.datetime "created_at"
     t.datetime "updated_at"
-    t.string   "status",               limit: 255, default: "READY", null: false
     t.integer  "expected_run_time",    limit: 4
     t.datetime "next_end_time"
+    t.integer  "state_cd",             limit: 4
   end
 
-  add_index "jobs", ["next_scheduled_time"], name: "index_jobs_on_next_scheduled_time", using: :btree
   add_index "jobs", ["public_id"], name: "index_jobs_on_public_id", using: :btree
 
   create_table "notifications", force: :cascade do |t|
