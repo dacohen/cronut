@@ -7,7 +7,8 @@ class JobsController < ApplicationController
   # GET /jobs
   # GET /jobs.json
   def index
-    @jobs = Job.all
+    # Sort by state DESC, then next_scheduled time, ASC. Reversing the first element makes it DESC.
+    @jobs = Job.all.sort { |x, y| [y.state, x.next_scheduled_time] <=> [x.state, y.next_scheduled_time] }
 
     respond_to do |format|
       format.html # index.html.erb

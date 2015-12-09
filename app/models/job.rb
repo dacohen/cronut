@@ -6,8 +6,6 @@ class Job < ActiveRecord::Base
 
   before_create :create_public_id!, :if => ->{ self.public_id.blank?}
 
-  default_scope ->{ order('state_cd DESC, name') }
-
   validates :name, :presence => true
   validates :expected_run_time, :presence => true
 
