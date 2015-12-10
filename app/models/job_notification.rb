@@ -5,7 +5,7 @@ class JobNotification < ActiveRecord::Base
 
   def alert!
     begin
-      self.last_event_key = notification.alert(job).incident_key
+      self.last_event_key = notification.alert(job)
       save!
     rescue Exception => e
       puts "Exception on alert trigger for #{job.name} - #{notification.name}: #{e.inspect}"
@@ -14,7 +14,7 @@ class JobNotification < ActiveRecord::Base
 
   def early_alert
     begin
-      self.last_event_key = notification.early_alert(job).incident_key
+      self.last_event_key = notification.early_alert(job)
       self.save!
     rescue Exception => e
       puts "Exception on early alert trigger for #{job.name} - #{notification.name}: #{e.inspect}"
@@ -23,7 +23,7 @@ class JobNotification < ActiveRecord::Base
 
   def late_alert
     begin
-      self.last_event_key = notification.late_alert(job).incident_key
+      self.last_event_key = notification.late_alert(job)
       self.save!
     rescue Exception => e
       puts "Exception on late alert trigger for #{job.name} - #{notification.name}: #{e.inspect}"
